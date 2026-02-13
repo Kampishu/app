@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lacàfe Algemesí</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="logo.png">
+    
+    <style>
+        :root { --cobalto: #0047AB; --electrico: #007FFF; --fondo: #f0f4f8; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--fondo); display: flex; flex-direction: column; height: 100vh; color: #333; }
+        
+        header { background: var(--cobalto); color: white; padding: 15px; display: flex; align-items: center; justify-content: center; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        header img { height: 60px; }
+        
+        .tabs { display: flex; background: white; border-bottom: 1px solid #ddd; }
+        .tab-btn { flex: 1; padding: 15px; border: none; font-weight: bold; color: #777; background: none; cursor: pointer; }
+        .tab-btn.active { color: var(--cobalto); border-bottom: 4px solid var(--cobalto); }
+
+        .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 15px; overflow-y: auto; flex-grow: 1; }
+        .product-btn { background: white; border: 2px solid var(--cobalto); border-radius: 12px; padding: 15px; color: var(--cobalto); font-weight: bold; font-size: 16px; }
+        .product-btn:active { background: var(--cobalto); color: white; }
+        
+        .order-box { background: white; padding: 20px; border-radius: 20px 20px 0 0; box-shadow: 0 -3px 15px rgba(0,0,0,0.1); }
+        .btn-send { background: #25D366; color: white; border: none; width: 100%; padding: 18px; border-radius: 12px; font-size: 18px; font-weight: bold; margin-top: 10px; }
+        
+        #adminPanel { display: none; background: #222; padding: 10px; justify-content: space-around; }
+        #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:1000; justify-content:center; align-items:center; }
+        .ticket { background: white; width: 85%; padding: 25px; border-radius: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<header>
+    <img src="logo.png" alt="Logo de Lacàfe">
+    <div>
+        <div style="font-size: 22px; font-weight: bold;">Lacàfe</div>
+        <div style="font-size: 13px; opacity: 0.9;">Algemesí</div>
+    </div>
+    <button onclick="toggleAdmin()" style="position:absolute; right:15px; background:none; border:none; color:white; font-size: 20px;">⚙️</button>
+</header>
+
+<div class="tabs">
+    <button class="tab-btn active" onclick="setTab('bebidas')">BEGUDES</button>
+    <button class="tab-btn" onclick="setTab('comidas')">MENJAR</button>
+</div>
+
+<div style="padding: 15px;"><input type="text" id="noteInput" placeholder="Ex: Sense sucre..." style="width:100%; padding:12px; border-radius:8px; border:1px solid #ccc; box-sizing: border-box;"></div>
+
+<div class="menu-grid" id="menuGrid"></div>
+
+<div id="adminPanel">
+    <button onclick="descargarExcel()" style="color:white; background:#28a745; border:none; padding:8px 15px;">Excel</button>
+    <button onclick="verCierre()" style="color:white; background:#007bff; border:none; padding:8px 15px;">Tancament</button>
+</div>
+
+<div class="order-box">
+    <div id="orderList" style="font-size: 14px; max-height: 80px; overflow-y: auto; margin-bottom: 10px;"></div>
+    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size: 18px;">
+        <span>TOTAL:</span> <span id="totalDisplay">0.00€</span>
+    </div>
+    <button class="btn-send" onclick="abrirTicket()">ENVIAR COMANDA</button>
+</div>
+
+<div id="modal">
+    <div class="ticket">
+        <img src="logo.png" style="width:70px;">
+        <h2>Lacàfe</h2>
+        <p>Algemesí</p>
+        <hr>
+        <div id="ticketItems" style="text-align:left;"></div>
+        <hr>
+        <h2 id="ticketTotal"></h2>
+        <button onclick="finalizarVenta()" style="background:var(--cobalto); color:white; width:100%; padding:15px; border:none; border-radius:10px; font-size: 16px; font-weight: bold;">ENVIAR PER WHATSAPP</button>
+        <button onclick="closeModal()" style="margin-top:15px; border:none; background:none; color:gray;">Tornar enrere</button>
+    </div>
+</div>
+
+<script>
+    let productos = {
+        bebidas: [{name:'Cafè Sol', price:1.20}, {name:'Tallat', price:1.30}, {name:'Cafè amb llet', price:1.50}, {name:'Capuccino', price:2.00}],
+        comidas: [{name:'Torrada oli', price:1.80}, {name:'Torrada tomaca', price:2.20}, {name:'Sandvitx', price:3.50}]
+    };
+    let ventas = JSON.parse(localStorage.getItem('lc_ventas')) || [];
+    let order = [];
+    let currentTab = 'bebidas';
+
+    function renderMenu() {
+        const grid = document.getElementById('menuGrid');
+        grid.innerHTML = '';
+        productos[currentTab].forEach((p) => {
+            const btn = document.createElement('button');
+            btn.className = 'product-btn';
+            btn.innerHTML = `${p.name}<br>${p.price.toFixed(2)}€`;
+            btn.onclick = () => agregar(p);
+            grid.appendChild(btn);
+        });
+    }
+
+    function agregar(p) {
+        const note = document.getElementById('noteInput').value;
+        order.push({...p, note});
+        document.getElementById('noteInput').value = '';
+        updateUI();
+    }
+
+    function updateUI() {
+        const list = document.getElementById('orderList');
+        let total = 0;
+        list.innerHTML = order.map(i => {
+            total += i.price;
+            return `• ${i.name} ${i.note ? `(${i.note})` : ''}<br>`;
+        }).join('');
+        document.getElementById('totalDisplay').innerText = `${total.toFixed(2)}€`;
+    }
+
+    function abrirTicket() {
+        if(order.length === 0) return;
+        document.getElementById('modal').style.display = 'flex';
+        document.getElementById('ticketItems').innerHTML = order.map(i => `<div>${i.name} <span style="float:right">${i.price.toFixed(2)}€</span></div>`).join('');
+        document.getElementById('ticketTotal').innerText = `TOTAL: ${document.getElementById('totalDisplay').innerText}`;
+    }
+
+    function finalizarVenta() {
+        const totalStr = document.getElementById('totalDisplay').innerText;
+        ventas.push({ fecha: new Date().toLocaleString(), total: totalStr });
+        localStorage.setItem('lc_ventas', JSON.stringify(ventas));
+        
+        let msg = "*Lacàfe Algemesí*%0A";
+        order.forEach(i => msg += `• ${i.name} ${i.note ? `(${i.note})` : ''}%0A`);
+        msg += `*TOTAL: ${totalStr}*`;
+        
+        window.open(`https://wa.me/?text=${msg}`);
+        order = []; updateUI(); closeModal();
+    }
+
+    function toggleAdmin() { document.getElementById('adminPanel').style.display = document.getElementById('adminPanel').style.display === 'flex' ? 'none' : 'flex'; }
+    function setTab(t) { currentTab = t; renderMenu(); }
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+    function descargarExcel() { alert("Funció d'exportació preparada!"); }
+    function verCierre() { alert("Vendes realitzades: " + ventas.length); }
+
+    renderMenu();
+</script>
+</body>
+</html>
