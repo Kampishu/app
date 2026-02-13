@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lacàfe Algemesí</title>
-    <meta  name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="logo.png">
     
@@ -12,7 +12,7 @@
         :root { --cobalto: #0047AB; --electrico: #007FFF; --fondo: #f0f4f8; }
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--fondo); display: flex; flex-direction: column; height: 100vh; color: #333; }
         
-        header { background: var(--cobalto); color: white; padding: 15px; display: flex; align-items: center; justify-content: center; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        header { background: var(--cobalto); color: white; padding: 15px; display: flex; align-items: center; justify-content: center; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); position: relative; }
         header img { height: 60px; }
         
         .tabs { display: flex; background: white; border-bottom: 1px solid #ddd; }
@@ -43,8 +43,8 @@
 </header>
 
 <div class="tabs">
-    <button class="tab-btn active" onclick="setTab('bebidas')">BEGUDES</button>
-    <button class="tab-btn" onclick="setTab('comidas')">MENJAR</button>
+    <button id="btn-bebidas" class="tab-btn active" onclick="setTab('bebidas')">BEGUDES</button>
+    <button id="btn-comidas" class="tab-btn" onclick="setTab('comidas')">MENJAR</button>
 </div>
 
 <div style="padding: 15px;"><input type="text" id="noteInput" placeholder="Ex: Sense sucre..." style="width:100%; padding:12px; border-radius:8px; border:1px solid #ccc; box-sizing: border-box;"></div>
@@ -87,6 +87,13 @@
     let order = [];
     let currentTab = 'bebidas';
 
+    function setTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + tab).classList.add('active');
+        renderMenu();
+    }
+
     function renderMenu() {
         const grid = document.getElementById('menuGrid');
         grid.innerHTML = '';
@@ -123,22 +130,42 @@
         document.getElementById('ticketTotal').innerText = `TOTAL: ${document.getElementById('totalDisplay').innerText}`;
     }
 
-    function finalizarVenta() {
-        const totalStr = document.getElementById('totalDisplay').innerText;
-        ventas.push({ fecha: new Date().toLocaleString(), total: totalStr });
-        localStorage.setItem('lc_ventas', JSON.stringify(ventas));
-        
-        let msg = "*Lacàfe Algemesí*%0A";
-        order.forEach(i => msg += `• ${i.name} ${i.note ? `(${i.note})` : ''}%0A`);
-        msg += `*TOTAL: ${totalStr}*`;
-        
-        window.open(`https://wa.me/?text=${msg}`);
-        order = []; updateUI(); closeModal();
+    function closeModal() {
+        document.getElementById('modal').style.display = 'none';
     }
 
-    function toggleAdmin() { document.getElementById('adminPanel').style.display = document.getElementById('adminPanel').style.display === 'flex' ? 'none' : 'flex'; }
-    function setTab(t) { currentTab = t; renderMenu(); }
-    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+    function finalizarVenta() {
+        if (order.length === 0) {
+            alert("El carret està buit!");
+            return;
+        }
+
+        let message = "⚠️ ¡ATENCIÓ! Un familiar ha usat l'App. Revisa si porta la cartera o ve a heretar.\n\n";
+        message += "☕ *Nou pedido per a Lacàfe:*\n";
+        
+        order.forEach(item => {
+            message += `- ${item.name} ${item.note ? '(' + item.note + ')' : ''} (${item.price.toFixed(2)}€)\n`;
+        });
+
+        let total = order.reduce((sum, item) => sum + item.price, 0);
+        message += `\n💰 *Total: ${total.toFixed(2)}€*`;
+        message += "\n\nPD: Cobra per davant, que ens coneguem! 😉";
+
+        let phone = "34678793966"; 
+        let url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+        
+        window.open(url, '_blank');
+
+        order = [];
+        updateUI();
+        closeModal();
+    }
+
+    function toggleAdmin() {
+        const panel = document.getElementById('adminPanel');
+        panel.style.display = (panel.style.display === 'flex') ? 'none' : 'flex';
+    }
+
     function descargarExcel() { alert("Funció d'exportació preparada!"); }
     function verCierre() { alert("Vendes realitzades: " + ventas.length); }
 
